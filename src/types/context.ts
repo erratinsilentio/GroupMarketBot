@@ -1,12 +1,13 @@
-import { Context } from 'telegraf';
-
-export interface BotContext extends Context {
-    session?: {
-        cart: OrderItem[];
-    }
-}
-
 interface OrderItem {
-    menuItemId: string;
-    quantity: number;
+  id: string;
+  name: string;
+  quantity: number;
+  price: number;
 }
+
+interface Session {
+  cart: OrderItem[];
+  orderState?: "awaiting_address" | "awaiting_payment";
+  deliveryAddress?: string;
+  currentView?: "menu" | "orders" | "payment" | "rules";
+} 

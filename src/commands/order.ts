@@ -1,135 +1,65 @@
-import { Composer } from 'telegraf';
-import { config } from '../config/config';
-import { Order, OrderItem } from '../types/order';
-import { menuItems } from '../data/menuItems';
-import { BotContext } from '../types/context';
+require('dotenv').config();
+const { Telegraf, Markup } = require('telegraf');
+const express = require('express');
 
-// Update BotContext interface to include order state
-declare module '../types/context' {
-    interface BotContext {
-        session: {
-            cart: OrderItem[];
-            orderState?: 'awaiting_address' | 'awaiting_payment';
-            deliveryAddress?: string;
-        }
-    }
-}
+// Initialize bot with your token
+const bot = new Telegraf(process.env.BOT_TOKEN);
 
-export const orderCommand = new Composer<BotContext>();
-
-// Start checkout process
-orderCommand.action('cart:checkout', async (ctx) => {
-    if (!ctx.session?.cart || ctx.session.cart.length === 0) {
-        await ctx.editMessageText('Your cart is empty!');
-        return;
-    }
-
-    await ctx.reply('Please provide your delivery address:');
-    ctx.session.orderState = 'awaiting_address';
+// Start command with inline keyboard
+bot.command('start', (ctx) => {
+    ctx.session.currentView = 'menu';
+    ctx.reply(
+        'Welcome to the Shop Bot! Choose an option:',
+        Markup.inlineKeyboard([
+            Markup.button.callback('Menu', 'menu'),
+            Markup.button.callback('Orders', 'orders'),
+            Markup.button.callback('Payment', 'payment'),
+            Markup.button.callback('Rules', 'rules')
+        ])
+    );
 });
 
-// Handle address input
-orderCommand.on('text', async (ctx) => {
-    if (!ctx.session?.orderState) return;
-
-    switch (ctx.session.orderState) {
-        case 'awaiting_address':
-            ctx.session.deliveryAddress = ctx.message.text;
-            await ctx.reply('Please choose your payment method:', {
-                reply_markup: {
-                    inline_keyboard: [
-                        [{ text: 'Credit Card', callback_data: 'pay:card' }],
-                        [{ text: 'PayPal', callback_data: 'pay:paypal' }],
-                        [{ text: 'Cash', callback_data: 'pay:cash' }]
-                    ]
-                }
-            });
-            ctx.session.orderState = 'awaiting_payment';
-            break;
-            
-        // Add more states as needed
-    }
+// Handle button actions
+bot.action('menu', (ctx) => {
+    ctx.session.currentView = 'menu';
+    ctx.reply('Here is our menu...');
+    // Add logic to display menu items
 });
 
-// Handle payment selection
-orderCommand.action(/^pay:(.+)$/, async (ctx) => {
-    const paymentMethod = ctx.match[1];
-    
-    if (!ctx.session?.cart || !ctx.session.deliveryAddress) {
-        await ctx.reply('Something went wrong. Please start over with /cart');
-        return;
-    }
-
-    // Create order
-    const order = createOrder(ctx, paymentMethod);
-    
-    // Send to channel
-    await sendOrderToChannel(ctx, order);
-    
-    // Clear cart and state
-    ctx.session.cart = [];
-    ctx.session.orderState = undefined;
-    ctx.session.deliveryAddress = undefined;
-
-    await ctx.editMessageText('Thank you for your order! We will process it shortly.');
+bot.action('orders', (ctx) => {
+    ctx.session.currentView = 'orders';
+    ctx.reply('Here are your current orders...');
+    // Add logic to display current orders
 });
 
-function createOrder(ctx: BotContext, paymentMethod: string): Order {
-    if (!ctx.session?.cart || !ctx.from) {
-        throw new Error('Invalid session or user data');
-    }
+bot.action('payment', (ctx) => {
+    ctx.session.currentView = 'payment';
+    ctx.reply('Payment options...');
+    // Add logic to handle payment
+});
 
-    const total = calculateTotal(ctx.session.cart);
+bot.action('rules', (ctx) => {
+    ctx.session.currentView = 'rules';
+    ctx.reply('Here are the rules...');
+    // Add logic to display rules
+});
 
-    return {
-        userId: ctx.from.id.toString(),
-        username: ctx.from.username || 'Unknown',
-        items: ctx.session.cart,
-        totalAmount: total,
-        paymentMethod,
-        deliveryAddress: ctx.session.deliveryAddress,
-        timestamp: new Date()
-    };
-}
+// Basic error handling
+bot.catch((err, ctx) => {
+    console.log(`Ooops, encountered an error for ${ctx.updateType}`, err);
+});
 
-function calculateTotal(cart: OrderItem[]): number {
-    return cart.reduce((total, item) => {
-        const menuItem = menuItems.find(i => i.id === item.menuItemId);
-        if (!menuItem) return total;
-        return total + (menuItem.price * item.quantity);
-    }, 0);
-}
+// Create an Express server
+const app = express();
 
-async function sendOrderToChannel(ctx: BotContext, order: Order) {
-    const message = formatOrderMessage(order);
-    
-    await ctx.telegram.sendMessage(config.CHANNEL_ID, message, {
-        parse_mode: 'HTML'
-    });
-}
+// Set the bot to use webhooks
+app.use(bot.webhookCallback('/api/webhook'));
 
-function formatOrderMessage(order: Order): string {
-    const items = order.items.map(item => {
-        const menuItem = menuItems.find(i => i.id === item.menuItemId);
-        if (!menuItem) return '';
-        return `${menuItem.name} x${item.quantity} ($${menuItem.price * item.quantity})`;
-    });
+// Start the server
+const PORT = process.env.PORT || 3000;
+app.listen(PORT, () => {
+    console.log(`Server running on port ${PORT}`);
+});
 
-    return `
-🆕 New Order!
-
-Customer: @${order.username}
-Order ID: #${order.timestamp.getTime().toString().slice(-6)}
-
-Items:
-${items.join('\n')}
-
-Total Amount: $${order.totalAmount.toFixed(2)}
-Payment Method: ${order.paymentMethod}
-
-Delivery Address:
-${order.deliveryAddress}
-
-Time: ${order.timestamp.toLocaleString()}
-`;
-}
+// Set webhook URL
+bot.telegram.setWebhook(`https://your-vercel-deployment-url.vercel.app/api/webhook`); 
