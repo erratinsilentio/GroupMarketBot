@@ -96,3 +96,24 @@ Output Requirements
 - Follow security best practices
 - Write maintainable code
 - Consider scalability
+
+
+
+BOT USER FLOW:
+
+1. User sends /start
+2. Bot sends welcome message with rules and two buttons: accept and decline
+3. User clicks accept
+4. Bot sends a message with a list of products
+5. User clicks on a product
+6. Bot sends a message with the product details and a button to add to cart
+7. User clicks add to cart
+8. Bot sends a message with the cart and a button to checkout
+9. User clicks checkout
+10. Bot sends a message with the checkout form and a button to confirm order
+11. User clicks confirm order
+12. Bot sends a message with the order confirmation and a button to pay
+13. User clicks pay
+14. Bot sends a message with the payment confirmation and a button to complete order
+15. User clicks complete order
+16. Bot sends a message with the order completion and a button to view order history
